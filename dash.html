@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Health Tracker</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+<style>
+  body {
+    padding: 20px;
+    font-family: 'Lato', sans-serif;
+    max-width: 600px;
+    margin: auto;
+  }
+
+  h2 {
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+
+  /* ------------------ MEDICATION TRACKER ------------------ */
+
+  #medSection {
+    margin-bottom: 40px;
+  }
+
+  #medDays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 15px;
+  }
+
+  .med-day {
+    height: 60px;
+    border: 2px solid #444;
+    border-radius: 10px;
+    background: #eee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+  }
+
+  .med-taken {
+    background: #7cd992;
+    color: white;
+  }
+
+  #medResetBtn {
+    margin-top: 10px;
+    background: #d84a4a;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    display: none;
+  }
+
+  #takeMedBtn {
+    padding: 10px 15px;
+    background: #4a7bd8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+  }
+
+  /* ------------------ PERIOD TRACKER ------------------ */
+
+  .section {
+    margin-bottom: 25px;
+  }
+
+  .inline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .inline-link {
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    margin-top: 10px;
+  }
+
+  canvas {
+    width: 100%;
+    height: 150px;
+    border: 1px solid #ccc;
+    display: block;
+  }
+
+  .chart-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-top: 5px;
+  }
+
+  #periodResetBtn {
+    margin-top: 40px;
+  }
+
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .history-controls {
+    display: flex;
+    gap: 5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========================================================= -->
+<!-- ===================== MEDICATION TRACKER ================= -->
+<!-- ========================================================= -->
+
+<h2>Medication Tracker</h2>
+
+<div id="medSection">
+  <div id="medDays"></div>
+  <button id="takeMedBtn">I took my meds today</button>
+  <button id="medResetBtn">Reset Week</button>
+</div>
+
+<script>
+  /* ------------------ MEDICATION TRACKER LOGIC ------------------ */
+
+  const medDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const medToday = new Date().getDay();
+
+  const medDaysContainer = document.getElementById("medDays");
+  const takeMedBtn = document.getElementById("takeMedBtn");
+  const medResetBtn = document.getElementById("medResetBtn");
+
+  let medTaken = JSON.parse(localStorage.getItem("medTakenDays")) || Array(7).fill(false);
+
+  function renderMedDays() {
+    medDaysContainer.innerHTML = "";
+    medDayNames.forEach((name, i) => {
+      const div = document.createElement("div");
+      div.className = "med-day" + (medTaken[i] ? " med-taken" : "");
+      div.textContent = name;
+      medDaysContainer.appendChild(div);
+    });
+
+    medResetBtn.style.display = medTaken[6] ? "block" : "none";
+  }
+
+  takeMedBtn.onclick = () => {
+    if (medTaken[medToday]) {
+      alert("You've already taken your meds today.");
+      return;
+    }
+    medTaken[medToday] = true;
+    localStorage.setItem("medTakenDays", JSON.stringify(medTaken));
+    renderMedDays();
+  };
+
+  medResetBtn.onclick = () => {
+    medTaken = Array(7).fill(false);
+    localStorage.setItem("medTakenDays", JSON.stringify(medTaken));
+    renderMedDays();
+  };
+
+  renderMedDays();
+</script>
+
+<!-- ========================================================= -->
+<!-- ======================= PERIOD TRACKER =================== -->
+<!-- ========================================================= -->
+
+<h2>Period Tracker</h2>
+
+<div class="section">
+  <div class="inline-row">
+    <button id="todayBtn">Log period</button>
+    <span id="toggleDateLink" class="inline-link">or choose a date</span>
+  </div>
+
+  <div id="datePicker" class="hidden">
+    <input type="date" id="newStart">
+    <button id="saveBtn">Add Period Start</button>
+  </div>
+</div>
+
+<hr>
+
+<div class="section">
+  <div class="info-grid" id="infoGrid"></div>
+</div>
+
+<div class="section">
+  <h3>Cycle Lengths (Past 12 Months)</h3>
+  <canvas id="chart"></canvas>
+  <div id="chartLabels" class="chart-labels"></div>
+</div>
+
+<p id="historyToggle" class="inline-link">History</p>
+<div id="historySection" class="hidden"></div>
+
+<button id="periodResetBtn">Reset All Data</button>
+
+<script>
+  /* ------------------ PERIOD TRACKER LOGIC ------------------ */
+
+  function loadDates() {
+    const stored = localStorage.getItem("periodStarts");
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  function saveDates(dates) {
+    localStorage.setItem("periodStarts", JSON.stringify(dates));
+  }
+
+  function calculateCycleLengths(dates) {
+    const lengths = [];
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i - 1]);
+      const curr = new Date(dates[i]);
+      const diff = (curr - prev) / (1000 * 60 * 60 * 24);
+      lengths.push({ length: Math.round(diff), date: curr });
+    }
+    return lengths;
+  }
+
+  function filterLast12Months(lengths) {
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 12);
+    return lengths.filter(item => item.date >= cutoff);
+  }
+
+  function calculateAverage(lengths) {
+    if (lengths.length === 0) return null;
+    const total = lengths.reduce((a, b) => a + b.length, 0);
+    return Math.round(total / lengths.length);
+  }
+
+  function updateDisplay() {
+    const dates = loadDates().sort();
+    const infoGrid = document.getElementById("infoGrid");
+
+    infoGrid.innerHTML = "";
+
+    if (dates.length === 0) {
+      infoGrid.innerHTML = "<div>No data yet.</div>";
+      drawChart([]);
+      updateHistory();
+      return;
+    }
+
+    const lastStart = new Date(dates[dates.length - 1]);
+    const lengths = calculateCycleLengths(dates);
+    const last12 = filterLast12Months(lengths);
+    const avg = calculateAverage(last12);
+
+    let nextStr = "N/A";
+    let daysStr = "N/A";
+    let avgStr = avg ? avg + " days" : "N/A";
+
+    if (avg) {
+      const next = new Date(lastStart);
+      next.setDate(lastStart.getDate() + avg);
+
+      const today = new Date();
+      const diff = Math.ceil((next - today) / (1000 * 60 * 60 * 24));
+
+      nextStr = next.toDateString();
+      daysStr = diff;
+    }
+
+    const items = [
+      ["Last period started:", lastStart.toDateString()],
+      ["Next predicted period:", nextStr],
+      ["Days until next:", daysStr],
+      ["Average cycle length:", avgStr]
+    ];
+
+    items.forEach(([label, value]) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<strong>${label}</strong><br>${value}`;
+      infoGrid.appendChild(div);
+    });
+
+    drawChart(last12);
+    updateHistory();
+  }
+
+  function drawChart(lengths) {
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const labelsDiv = document.getElementById("chartLabels");
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    labelsDiv.innerHTML = "";
+
+    const maxBars = 12;
+    const barWidth = canvas.width / maxBars;
+
+    const months = Array(maxBars).fill(null);
+    const now = new Date();
+
+    for (let i = 0; i < maxBars; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - (maxBars - 1 - i), 1);
+      months[i] = { month: d.toLocaleString('default', { month: 'short' }), length: null };
+    }
+
+    lengths.forEach(item => {
+      const monthIndex = months.findIndex(m =>
+        m.month === item.date.toLocaleString('default', { month: 'short' })
+      );
+      if (monthIndex !== -1) months[monthIndex].length = item.length;
+    });
+
+    const maxLength = Math.max(...months.map(m => m.length || 0), 1);
+
+    months.forEach((m, i) => {
+      if (m.length !== null) {
+        const barHeight = (m.length / maxLength) * canvas.height;
+        ctx.fillStyle = "#555";
+        ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 2, barHeight);
+      }
+      const label = document.createElement("div");
+      label.textContent = m.month;
+      labelsDiv.appendChild(label);
+    });
+  }
+
+  function updateHistory() {
+    const historyDiv = document.getElementById("historySection");
+    const dates = loadDates().sort().reverse();
+
+    historyDiv.innerHTML = "";
+
+    dates.forEach(d => {
+      const row = document.createElement("div");
+      row.className = "history-item";
+
+      const dateObj = new Date(d);
+      const label = document.createElement("span");
+      label.textContent = dateObj.toDateString();
+
+      const controls = document.createElement("span");
+      controls.className = "history-controls";
+
+      const editBtn = document.createElement("button");
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => {
+        const newDate = prompt("Edit date (YYYY-MM-DD):", d);
+        if (newDate) {
+          const all = loadDates();
+          const idx = all.indexOf(d);
+          all[idx] = newDate;
+          saveDates(all);
+          updateDisplay();
+        }
+      };
+
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "Delete";
+      delBtn.onclick = () => {
+        const all = loadDates();
+        const idx = all.indexOf(d);
+        all.splice(idx, 1);
+        saveDates(all);
+        updateDisplay();
+      };
+
+      controls.appendChild(editBtn);
+      controls.appendChild(delBtn);
+
+      row.appendChild(label);
+      row.appendChild(controls);
+
+      historyDiv.appendChild(row);
+    });
+  }
+
+  document.getElementById("toggleDateLink").addEventListener("click", () => {
+    document.getElementById("datePicker").classList.toggle("hidden");
+  });
+
+  document.getElementById("historyToggle").addEventListener("click", () => {
+    document.getElementById("historySection").classList.toggle("hidden");
+  });
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    const newStart = document.getElementById("newStart").value;
+    if (!newStart) return;
+
+    const dates = loadDates();
+    dates.push(newStart);
+    saveDates(dates);
+
+    updateDisplay();
+  });
+
+  document.getElementById("todayBtn").addEventListener("click", () => {
+    const today = new Date().toISOString().split("T")[0];
+    const dates = loadDates();
+    dates.push(today);
+    saveDates(dates);
+
+    updateDisplay();
+  });
+
+  document.getElementById("periodResetBtn").addEventListener("click", () => {
+    localStorage.removeItem("periodStarts");
+    updateDisplay();
+  });
+
+  updateDisplay();
+</script>
+
+</body>
+</html>
