@@ -57,9 +57,12 @@ Please help me continue building or debugging widgets using this architecture.
 - [<code>currentWork</code>](#currentwork)
 - [<code>actionValues</code>](#actionvalues)
 - [<code>writeCopy</code>](#writecopy)
+- [<code>assetLibrary</code>](#assetlibrary)
 <!---->
 #### `currentWork`
 #### `actionValues`
+#### `writeCopy` <!-- content bank -->
+#### `actionValues` <!-- design library -->
 
 ## processes
 ### project briefs
