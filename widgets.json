@@ -1,3 +1,7 @@
 {
-  "widgets": ["weather", "todo"]
+    "widgets": [
+        "weather",
+        "notes",
+        "clock"
+    ]
 }
