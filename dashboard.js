@@ -1,30 +1,34 @@
 async function loadWidgets() {
-    const config = await fetch("widgets.json").then(r => r.json());
-    const widgetList = config.widgets;
+  const config = await fetch("widgets.json").then(r => r.json());
+  const widgetList = config.widgets;
+  const dashboard = document.getElementById("dashboard");
 
-    const dashboard = document.getElementById("dashboard");
+  // Start all HTML fetches in parallel
+  const htmlPromises = widgetList.map(name =>
+    fetch(`widgets/${name}/index.html`).then(r => r.text())
+  );
 
-    widgetList.forEach(async (widgetName) => {
-        const widgetPath = `widgets/${widgetName}`;
+  const htmlResults = await Promise.all(htmlPromises);
 
-        // Load HTML
-        const html = await fetch(`${widgetPath}/index.html`).then(r => r.text());
-        const wrapper = document.createElement("div");
-        wrapper.classList.add("widget");
-        wrapper.innerHTML = html;
-        dashboard.appendChild(wrapper);
+  // Append in the original order
+  htmlResults.forEach((html, i) => {
+    const widgetName = widgetList[i];
+    const widgetPath = `widgets/${widgetName}`;
 
-        // Load CSS
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = `${widgetPath}/style.css`;
-        document.head.appendChild(link);
+    const wrapper = document.createElement("div");
+    wrapper.classList.add("widget");
+    wrapper.innerHTML = html;
+    dashboard.appendChild(wrapper);
 
-        // Load JS
-        const script = document.createElement("script");
-        script.src = `${widgetPath}/main.js`;
-        document.body.appendChild(script);
-    });
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `${widgetPath}/style.css`;
+    document.head.appendChild(link);
+
+    const script = document.createElement("script");
+    script.src = `${widgetPath}/main.js`;
+    document.body.appendChild(script);
+  });
 }
 
 loadWidgets();
